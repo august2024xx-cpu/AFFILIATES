@@ -186,6 +186,7 @@
     </style>
 </head>
 <body>
+
     <div class="container">
         <h1>PIZZA COIN AFFILIATE PROGRAM</h1>
         
@@ -201,7 +202,7 @@
 
             <div class="form-group">
                 <label for="polygonAddress">ENTER YOUR POLYGON 0X... ADDRESS (PAYMENTS)</label>
-                <input type="text" id="polygonAddress" placeholder="0x..." pattern="^0x[a-fA-F0-9]{40}$" title="Please enter a valid Polygon address starting with 0x" required>
+                <input type="text" id="polygonAddress" placeholder="0x..." required>
             </div>
 
             <div class="form-group">
@@ -228,22 +229,25 @@
         const copyBtn = document.getElementById('copyBtn');
         const toast = document.getElementById('toast');
 
-        form.addEventListener('submit', async function(e) {
+        form.addEventListener('submit', function(e) {
             e.preventDefault();
+            console.log("🟢 1. Form submit event triggered!");
            
             const email = document.getElementById('email').value.trim();
             const polygonAddress = document.getElementById('polygonAddress').value.trim();
             const endpoint = document.getElementById('appsScriptUrl').value.trim();
 
+            console.log("🟢 2. Inputs gathered:", { email, polygonAddress, endpoint });
+
             if (email && polygonAddress && endpoint) {
-                // Generate unique referral link
+                // Generate referral link
                 const baseUrl = window.location.origin + window.location.pathname;
                 const affiliateLink = `${baseUrl}?ref=${polygonAddress}`;
 
                 affiliateLinkBox.textContent = affiliateLink;
                 resultSection.style.display = 'block';
 
-                // Send registration payload to Google Sheets without hanging or blocking
+                // Registration payload for Google Sheets
                 const payload = {
                     action: 'registerAffiliate',
                     affiliateId: polygonAddress,
@@ -251,19 +255,31 @@
                     walletAddress: polygonAddress
                 };
 
-                try {
-                    await fetch(endpoint, {
+                console.log("🟢 3. Dispatching payload to Google Sheets:", payload);
+
+                // Send via sendBeacon first, fallback to fetch
+                const blob = new Blob([JSON.stringify(payload)], { type: 'text/plain;charset=utf-8' });
+                
+                if (navigator.sendBeacon) {
+                    const sent = navigator.sendBeacon(endpoint, blob);
+                    console.log("🟢 4. sendBeacon dispatched:", sent);
+                    showToast("Registered & saved to Google Sheets!");
+                } else {
+                    fetch(endpoint, {
                         method: 'POST',
                         mode: 'no-cors',
                         keepalive: true,
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         body: JSON.stringify(payload)
+                    }).then(() => {
+                        console.log("🟢 4. Fetch request completed!");
+                        showToast("Registered & saved to Google Sheets!");
+                    }).catch(err => {
+                        console.error("🔴 Sheet sync error:", err);
                     });
-                    
-                    showToast("Registered & saved to Google Sheets!");
-                } catch (err) {
-                    console.error("Sheet sync error:", err);
                 }
+            } else {
+                console.warn("⚠️ Missing required inputs.");
             }
         });
 
@@ -271,7 +287,7 @@
             const linkText = affiliateLinkBox.textContent;
             navigator.clipboard.writeText(linkText).then(() => {
                 showToast("Link copied to clipboard!");
-            }).catch(err => {
+            }).catch(() => {
                 const tempInput = document.createElement('input');
                 tempInput.value = linkText;
                 document.body.appendChild(tempInput);
